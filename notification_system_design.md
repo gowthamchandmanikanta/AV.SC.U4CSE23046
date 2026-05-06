@@ -257,3 +257,60 @@ ON notifications (type);
 CREATE INDEX idx_student_notifications_date
 ON student_notifications (created_at DESC);
 ```
+
+## Stage 4
+
+Fetching notifications on every page load for every student can put too much load on the database. It also gives a slow experience because the same data may be requested again and again.
+
+### Suggested Improvements
+
+Use pagination or limit:
+
+```http
+GET /api/notifications?limit=20&page=1
+```
+
+Only the latest few notifications should be loaded first. Older notifications can be loaded when the user scrolls or clicks next page.
+
+Use caching:
+
+Recent notifications for a student can be cached in Redis for a short time, like 1 or 2 minutes. This reduces repeated database calls.
+
+Tradeoff: cache can sometimes show slightly old data, so cache should be cleared when a new notification is added or when a notification is marked as read.
+
+Use unread count API:
+
+Instead of loading all notifications on every page, the frontend can first call:
+
+```http
+GET /api/notifications/unread-count
+```
+
+Response:
+
+```json
+{
+  "unreadCount": 5
+}
+```
+
+Then full notifications can be fetched only when the user opens the notification panel.
+
+Use real-time updates:
+
+For new notifications, Server-Sent Events can push updates to logged-in users. This avoids repeated polling from the frontend.
+
+Tradeoff: real-time connections need more server resources, so they should be used only for active logged-in users.
+
+Use proper indexes:
+
+```sql
+CREATE INDEX idx_student_notifications_recent
+ON student_notifications (student_id, created_at DESC);
+```
+
+This helps fetch recent notifications quickly for one student.
+
+### Final Approach
+
+I would use pagination, indexing, short-term caching, and real-time updates. The frontend should not fetch full notifications on every page load. It should fetch unread count first and load full notifications only when required.
