@@ -314,3 +314,59 @@ This helps fetch recent notifications quickly for one student.
 ### Final Approach
 
 I would use pagination, indexing, short-term caching, and real-time updates. The frontend should not fetch full notifications on every page load. It should fetch unread count first and load full notifications only when required.
+
+## Stage 5
+
+The given implementation is not reliable for 50,000 students because everything is done one by one inside a loop.
+
+### Shortcomings
+
+- If `send_email` fails for one student, the next steps may also be affected.
+- It will be slow because email API, database insert, and app notification are all called one by one.
+- There is no retry for failed emails.
+- There is no batching, so the database gets too many small insert requests.
+- Email sending and database saving are mixed together.
+
+Saving to DB and sending email should not happen as one blocking process. First, the notification should be saved reliably. After that, email and app notification can be processed separately using background jobs.
+
+### Better Flow
+
+```text
+function notify_all(student_ids, message):
+  notification_id = save_notification(message)
+
+  for batch in split(student_ids, 500):
+    save_student_notifications(notification_id, batch)
+    add_email_job(notification_id, batch)
+    add_app_notification_job(notification_id, batch)
+
+  return "notification queued successfully"
+```
+
+### Email Worker
+
+```text
+function email_worker(job):
+  for student_id in job.student_ids:
+    try:
+      send_email(student_id, job.message)
+      mark_email_sent(student_id, job.notification_id)
+    catch error:
+      retry_later(student_id, job.notification_id)
+```
+
+### App Notification Worker
+
+```text
+function app_notification_worker(job):
+  for student_id in job.student_ids:
+    push_to_app(student_id, job.message)
+```
+
+### Why This Is Better
+
+- Database insert can be done in batches.
+- Email failure will not stop DB saving.
+- Failed emails can be retried.
+- App notifications and emails can run in parallel.
+- The user gets a quick response that the notification has been queued.
