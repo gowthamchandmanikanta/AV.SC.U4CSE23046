@@ -370,3 +370,42 @@ function app_notification_worker(job):
 - Failed emails can be retried.
 - App notifications and emails can run in parallel.
 - The user gets a quick response that the notification has been queued.
+
+## Stage 6
+
+For priority inbox, unread notifications should be shown based on importance and latest time. I used this priority order:
+
+```text
+Placement > Result > Event
+```
+
+If two notifications have the same type priority, the latest notification should come first.
+
+The backend fetches notifications from:
+
+```http
+GET http://20.207.122.201/evaluation-service/notifications
+```
+
+Then it sorts the notifications and returns only the top `n`.
+
+API created:
+
+```http
+GET /priority-notifications?limit=10
+```
+
+Run command:
+
+```powershell
+$env:LOG_ACCESS_TOKEN="paste_access_token_here"
+npm run start:notifications
+```
+
+Postman URL:
+
+```text
+GET http://localhost:3002/priority-notifications?limit=10
+```
+
+To keep top notifications efficient, the system should not scan everything again and again in a real database. It can keep indexes on notification type and timestamp. For more scale, the top unread notification list can also be cached for each student and updated when a new notification comes or when one is marked as read.
