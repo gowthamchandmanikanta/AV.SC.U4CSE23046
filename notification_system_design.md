@@ -198,3 +198,62 @@ ON student_notifications (student_id, created_at DESC);
 CREATE INDEX idx_student_notifications_unread
 ON student_notifications (student_id, is_read);
 ```
+
+## Stage 3
+
+The given query is not fully correct for the schema from Stage 2, because read status is stored in `student_notifications`, not directly in `notifications`.
+
+Original query:
+
+```sql
+SELECT *
+FROM notifications
+WHERE studentID = 1042
+  AND isRead = false
+ORDER BY createdAt DESC;
+```
+
+Better query:
+
+```sql
+SELECT n.id, n.type, n.message, sn.is_read, sn.created_at
+FROM student_notifications sn
+JOIN notifications n ON n.id = sn.notification_id
+WHERE sn.student_id = '1042'
+  AND sn.is_read = false
+ORDER BY sn.created_at DESC
+LIMIT 20;
+```
+
+This query can be slow because the table has many rows. If there is no proper index, the database may scan many notifications for many students and then sort them by date.
+
+### Index For Unread Notifications
+
+```sql
+CREATE INDEX idx_student_unread_recent
+ON student_notifications (student_id, is_read, created_at DESC);
+```
+
+With this index, the database can directly find unread notifications for one student in recent order. The cost becomes closer to `O(log n + limit)` instead of scanning a large table.
+
+Adding indexes on every column is not a good idea. Indexes need extra storage and slow down insert/update operations. We should add indexes only for columns that are used often in `WHERE`, `JOIN`, and `ORDER BY`.
+
+### Placement Notifications In Last 7 Days
+
+```sql
+SELECT DISTINCT sn.student_id
+FROM student_notifications sn
+JOIN notifications n ON n.id = sn.notification_id
+WHERE n.type = 'Placement'
+  AND sn.created_at >= CURRENT_TIMESTAMP - INTERVAL '7 days';
+```
+
+Useful index for this query:
+
+```sql
+CREATE INDEX idx_notifications_type
+ON notifications (type);
+
+CREATE INDEX idx_student_notifications_date
+ON student_notifications (created_at DESC);
+```
