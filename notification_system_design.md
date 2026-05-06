@@ -2,171 +2,132 @@
 
 ## Stage 1
 
-### Goal
-
-Design REST APIs for showing notifications to logged-in users. The APIs support creating notifications, listing user notifications, marking notifications as read, deleting notifications, and receiving real-time updates.
+The notification system should allow a logged-in student to see notifications related to placements, events, and results. The backend can expose simple REST APIs for creating, reading, updating, and deleting notifications. Since users are already logged in, every request should send the authorization token in the header.
 
 ### Common Headers
 
-All protected endpoints require:
-
 ```http
-Authorization: Bearer <access_token>
+Authorization: Bearer <token>
 Content-Type: application/json
-Accept: application/json
 ```
 
-### Notification Types
+### 1. Create Notification
 
-Allowed notification types:
-
-```text
-Placement
-Result
-Event
-```
-
-### Create Notification
-
-Endpoint:
+This API can be used by the backend/admin service to create a notification for one or more students.
 
 ```http
 POST /api/notifications
 ```
 
-Request body:
+Request:
 
 ```json
 {
   "type": "Placement",
-  "message": "Advanced Micro Devices Inc. hiring",
-  "targetUserIds": ["student-101", "student-102"],
-  "channels": ["in_app", "email"]
+  "message": "New placement drive announced",
+  "studentIds": ["101", "102", "103"]
 }
 ```
 
-Success response:
+Response:
 
 ```json
 {
-  "notificationId": "b8c1cc9d-3d94-4a4f-a9c2-f75c97c2cc11",
-  "status": "queued",
-  "createdAt": "2026-04-22T17:49:42Z"
+  "id": "notification-id",
+  "message": "notification created successfully"
 }
 ```
 
-### Get Logged-In User Notifications
+### 2. Get Notifications
 
-Endpoint:
+This API returns notifications for the logged-in student. Pagination is added so the response does not become too large.
 
 ```http
-GET /api/notifications?limit=20&cursor=next-page-token
+GET /api/notifications?limit=20&page=1
 ```
 
-Success response:
+Response:
 
 ```json
 {
-  "items": [
+  "notifications": [
     {
-      "id": "8a7412bd-6065-4d09-8501-a37f11cc848b",
+      "id": "notification-id",
       "type": "Placement",
-      "message": "Advanced Micro Devices Inc. hiring",
-      "timestamp": "2026-04-22T17:49:42Z",
-      "isRead": false
+      "message": "New placement drive announced",
+      "isRead": false,
+      "createdAt": "2026-04-22T17:49:42Z"
     }
-  ],
-  "nextCursor": "next-page-token"
+  ]
 }
 ```
 
-### Mark Notification As Read
-
-Endpoint:
+### 3. Mark Notification As Read
 
 ```http
-PATCH /api/notifications/{notificationId}/read
+PATCH /api/notifications/{id}/read
 ```
 
-Success response:
+Response:
 
 ```json
 {
-  "notificationId": "8a7412bd-6065-4d09-8501-a37f11cc848b",
-  "isRead": true,
-  "readAt": "2026-04-22T18:05:00Z"
+  "id": "notification-id",
+  "isRead": true
 }
 ```
 
-### Mark All Notifications As Read
-
-Endpoint:
+### 4. Mark All As Read
 
 ```http
 PATCH /api/notifications/read-all
 ```
 
-Success response:
+Response:
 
 ```json
 {
-  "updatedCount": 12,
-  "status": "success"
+  "message": "all notifications marked as read"
 }
 ```
 
-### Delete Notification
-
-Endpoint:
+### 5. Delete Notification
 
 ```http
-DELETE /api/notifications/{notificationId}
+DELETE /api/notifications/{id}
 ```
 
-Success response:
+Response:
 
 ```json
 {
-  "notificationId": "8a7412bd-6065-4d09-8501-a37f11cc848b",
-  "status": "deleted"
+  "message": "notification deleted successfully"
 }
 ```
 
 ### Real-Time Notifications
 
-Use Server-Sent Events because the frontend only needs one-way real-time notification delivery from server to client.
-
-Endpoint:
+For real-time updates, Server-Sent Events can be used because notifications are mainly sent from server to client.
 
 ```http
 GET /api/notifications/stream
 ```
 
-Headers:
-
-```http
-Authorization: Bearer <access_token>
-Accept: text/event-stream
-```
-
-Event payload:
+Response event:
 
 ```json
 {
-  "id": "1cfe5ee-ad37-4894-8946-d707627176a5",
+  "id": "notification-id",
   "type": "Event",
-  "message": "tech-fest",
-  "timestamp": "2026-04-22T17:50:06Z"
+  "message": "Tech fest registration opened",
+  "createdAt": "2026-04-22T17:50:06Z"
 }
 ```
 
-### Error Response Format
+### Error Response
 
 ```json
 {
-  "error": {
-    "code": "UNAUTHORIZED",
-    "message": "A valid authorization token is required"
-  }
+  "message": "unauthorized request"
 }
 ```
